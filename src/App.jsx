@@ -18,14 +18,20 @@ const randomIntInRange = (min, max) => {
 
 const buildValidSchedule = (validCount, tickCount, speedMs) => {
   const firstValidAfterTicks = Math.ceil(3000 / speedMs);
+  const firstValidBeforeTicks = Math.max(firstValidAfterTicks, Math.ceil(6000 / speedMs) - 1);
   const minGapTicks = Math.max(1, Math.ceil(2000 / speedMs));
 
   if (firstValidAfterTicks >= tickCount) {
     return [];
   }
 
+  const boundedFirstMax = Math.min(firstValidBeforeTicks, tickCount - 1);
+  if (boundedFirstMax < firstValidAfterTicks) {
+    return [];
+  }
+
   const maxPossible =
-    Math.floor((tickCount - 1 - firstValidAfterTicks) / minGapTicks) + 1;
+    Math.floor((tickCount - 1 - boundedFirstMax) / minGapTicks) + 1;
   const targetCount = Math.min(validCount, maxPossible);
 
   if (targetCount <= 0) {
@@ -36,7 +42,15 @@ const buildValidSchedule = (validCount, tickCount, speedMs) => {
   for (let i = 0; i < targetCount; i += 1) {
     const remaining = targetCount - i - 1;
     const minTick = i === 0 ? firstValidAfterTicks : schedule[i - 1] + minGapTicks;
-    const maxTick = tickCount - 1 - remaining * minGapTicks;
+    const maxTick =
+      i === 0
+        ? Math.min(boundedFirstMax, tickCount - 1 - remaining * minGapTicks)
+        : tickCount - 1 - remaining * minGapTicks;
+
+    if (maxTick < minTick) {
+      return schedule;
+    }
+
     schedule.push(randomIntInRange(minTick, maxTick));
   }
 
@@ -52,8 +66,6 @@ const App = () => {
   const [elapsedSec, setElapsedSec] = useState(0);
   const [currentQrValue, setCurrentQrValue] = useState("");
   const [currentIsValid, setCurrentIsValid] = useState(false);
-  const [validShown, setValidShown] = useState(0);
-  const [scheduledValidCount, setScheduledValidCount] = useState(0);
   const [sessionLabel, setSessionLabel] = useState("");
 
   const sessionRef = useRef({
@@ -100,7 +112,6 @@ const App = () => {
 
     if (isValid) {
       state.validEmitted += 1;
-      setValidShown(state.validEmitted);
     }
 
     setCurrentIsValid(isValid);
@@ -119,8 +130,6 @@ const App = () => {
 
     clearAllTimers();
     setElapsedSec(0);
-    setValidShown(0);
-    setScheduledValidCount(schedule.length);
     setRunning(true);
     setSessionLabel(sessionId);
     sessionRef.current = {
@@ -236,15 +245,6 @@ const App = () => {
             <div className="meta-line">
               Elapsed: <strong>{elapsedSec}s</strong>
             </div>
-            <div className="meta-line">
-              Valid pulses shown:{" "}
-              <strong>
-                {validShown}/{scheduledValidCount}
-              </strong>
-            </div>
-            {currentIsValid && (
-              <div className="status-chip status-valid">Valid attendance QR active</div>
-            )}
             <button className="danger-btn" onClick={stopSession}>
               End Session
             </button>
