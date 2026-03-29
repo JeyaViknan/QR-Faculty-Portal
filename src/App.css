@@ -1,10 +1,246 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
-}
-QRCodeSVG {
-  border:2em white solid;
+@import url("https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;700&family=Plus+Jakarta+Sans:wght@500;700&display=swap");
 
+:root {
+  color-scheme: dark;
+  --bg: #0a1020;
+  --panel: rgba(21, 29, 54, 0.75);
+  --card: rgba(255, 255, 255, 0.07);
+  --line: rgba(255, 255, 255, 0.14);
+  --text: #f4f7ff;
+  --muted: #96a3c2;
+  --accent: #6ee7d8;
+  --accent-2: #8fa5ff;
+  --danger: #ff6f7d;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Outfit", sans-serif;
+  color: var(--text);
+  background:
+    radial-gradient(circle at 10% 10%, rgba(143, 165, 255, 0.26), transparent 35%),
+    radial-gradient(circle at 88% 85%, rgba(110, 231, 216, 0.2), transparent 32%),
+    var(--bg);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.app-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.setup-card {
+  width: min(760px, 100%);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  padding: 28px;
+  backdrop-filter: blur(14px);
+  box-shadow: 0 16px 50px rgba(0, 0, 0, 0.34);
+}
+
+.eyebrow {
+  margin: 0;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+  color: var(--accent);
+}
+
+h1,
+h2 {
+  margin: 10px 0 8px;
+  font-family: "Plus Jakarta Sans", sans-serif;
+  letter-spacing: -0.02em;
+}
+
+.subtext {
+  margin: 0 0 20px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+
+.field input {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 1rem;
+  font-family: inherit;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.field input:focus {
+  outline: 2px solid rgba(110, 231, 216, 0.35);
+  border-color: transparent;
+}
+
+.defaults-note {
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.setup-actions {
+  margin-top: 22px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+button {
+  border: none;
+  border-radius: 12px;
+  padding: 10px 16px;
+  font-family: "Plus Jakarta Sans", sans-serif;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: transform 0.16s ease, opacity 0.16s ease;
+}
+
+button:hover {
+  transform: translateY(-1px);
+  opacity: 0.96;
+}
+
+.primary-btn {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #101827;
+}
+
+.ghost-btn {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  border: 1px solid var(--line);
+}
+
+.danger-btn {
+  margin-top: auto;
+  background: var(--danger);
+  color: #1e0d12;
+}
+
+.session-view {
+  width: 100%;
+  min-height: calc(100vh - 48px);
+  display: grid;
+  grid-template-columns: 1fr minmax(260px, 320px);
+  gap: 18px;
+}
+
+.qr-stage {
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  padding: 18px;
+  background: rgba(255, 255, 255, 0.03);
+  display: grid;
+}
+
+.qr-frame {
+  width: 100%;
+  height: 100%;
+  min-height: 72vh;
+  border-radius: 20px;
+  background: #ffffff;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.qr-svg {
+  width: min(90vh, 94%);
+  height: min(90vh, 94%);
+}
+
+.session-panel {
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  padding: 20px;
+  background: var(--panel);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.timer-box {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px;
+  background: var(--card);
+}
+
+.timer-label {
+  color: var(--muted);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+}
+
+.timer-value {
+  font-family: "Plus Jakarta Sans", sans-serif;
+  font-size: 2.5rem;
+}
+
+.meta-line {
+  color: var(--muted);
+}
+
+.status-chip {
+  margin-top: 6px;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 0.84rem;
+  letter-spacing: 0.02em;
+  width: fit-content;
+}
+
+.status-valid {
+  color: #04241f;
+  background: var(--accent);
+}
+
+.status-noise {
+  color: #14203a;
+  background: #a8b8ff;
+}
+
+@media (max-width: 980px) {
+  .session-view {
+    grid-template-columns: 1fr;
+  }
+
+  .qr-frame {
+    min-height: 58vh;
+  }
+
+  .qr-svg {
+    width: min(75vw, 94%);
+    height: min(75vw, 94%);
+  }
 }
