@@ -2,256 +2,172 @@ import React, { useEffect, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import "./App.css";
 
-const DEFAULTS = {
-  speedMs: 500,
-  validQrCount: 4,
-  durationSec: 30,
-};
-
-const randomToken = () =>
-  `${Math.random().toString(36).slice(2, 10)}-${Date.now().toString(36)}`;
-
-const randomIntInRange = (min, max) => {
-  if (max <= min) return min;
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-};
-
-const buildValidSchedule = (validCount, tickCount, speedMs) => {
-  const firstValidAfterTicks = Math.ceil(3000 / speedMs);
-  const firstValidBeforeTicks = Math.max(firstValidAfterTicks, Math.ceil(6000 / speedMs) - 1);
-  const minGapTicks = Math.max(1, Math.ceil(2000 / speedMs));
-
-  if (firstValidAfterTicks >= tickCount) {
-    return [];
-  }
-
-  const boundedFirstMax = Math.min(firstValidBeforeTicks, tickCount - 1);
-  if (boundedFirstMax < firstValidAfterTicks) {
-    return [];
-  }
-
-  const maxPossible =
-    Math.floor((tickCount - 1 - boundedFirstMax) / minGapTicks) + 1;
-  const targetCount = Math.min(validCount, maxPossible);
-
-  if (targetCount <= 0) {
-    return [];
-  }
-
-  const schedule = [];
-  for (let i = 0; i < targetCount; i += 1) {
-    const remaining = targetCount - i - 1;
-    const minTick = i === 0 ? firstValidAfterTicks : schedule[i - 1] + minGapTicks;
-    const maxTick =
-      i === 0
-        ? Math.min(boundedFirstMax, tickCount - 1 - remaining * minGapTicks)
-        : tickCount - 1 - remaining * minGapTicks;
-
-    if (maxTick < minTick) {
-      return schedule;
-    }
-
-    schedule.push(randomIntInRange(minTick, maxTick));
-  }
-
-  return schedule;
-};
+const imageCount = 5;
+const images = Array.from({ length: imageCount }, (_, i) => `/images/${i + 1}.jpg`);
+const interval = 500;
 
 const App = () => {
-  const [speedMs, setSpeedMs] = useState(DEFAULTS.speedMs);
-  const [validQrCount, setValidQrCount] = useState(DEFAULTS.validQrCount);
-  const [durationSec, setDurationSec] = useState(DEFAULTS.durationSec);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [showQR, setShowQR] = useState(false);
+  const [elapsedTime, setElapsedTime] = useState(0);
   const [running, setRunning] = useState(false);
+  const [qrValue, setQrValue] = useState("");
 
-  const [elapsedSec, setElapsedSec] = useState(0);
-  const [currentQrValue, setCurrentQrValue] = useState("");
-  const [currentIsValid, setCurrentIsValid] = useState(false);
-  const [sessionLabel, setSessionLabel] = useState("");
-
-  const sessionRef = useRef({
-    id: "",
-    tickCount: 1,
-    currentTick: 0,
-    validTicks: new Set(),
-    validEmitted: 0,
-    speedMs: DEFAULTS.speedMs,
-  });
-  const qrIntervalRef = useRef(null);
   const timerRef = useRef(null);
+  const imageIntervalRef = useRef(null);
+  const qrTimeoutRefs = useRef([]);
 
-  const clearAllTimers = () => {
-    clearInterval(qrIntervalRef.current);
+  const stopAll = () => {
     clearInterval(timerRef.current);
-    qrIntervalRef.current = null;
-    timerRef.current = null;
-  };
-
-  const stopSession = () => {
-    clearAllTimers();
+    clearInterval(imageIntervalRef.current);
+    qrTimeoutRefs.current.forEach((t) => clearTimeout(t));
+    qrTimeoutRefs.current = [];
     setRunning(false);
-    setCurrentIsValid(false);
+    setShowQR(false);
   };
 
-  const emitNextQr = () => {
-    const state = sessionRef.current;
-    const isValid = state.validTicks.includes(state.currentTick);
-    const nowIso = new Date().toISOString();
-    const payload = isValid
-      ? {
-          type: "attendance-valid",
-          sessionId: state.id,
-          pulse: state.validEmitted + 1,
-          timestamp: nowIso,
-        }
-      : {
-          type: "attendance-noise",
-          sessionId: state.id,
-          nonce: randomToken(),
-          timestamp: nowIso,
-        };
+  const startSequence = () => {
+    stopAll();
 
-    if (isValid) {
-      state.validEmitted += 1;
-    }
+    const now = new Date();
+    const hh = String(now.getHours()).padStart(2, "0");
+    const mm = String(now.getMinutes()).padStart(2, "0");
+    setQrValue(`jeycavbhakanadiyaz${hh}${mm}`);
 
-    setCurrentIsValid(isValid);
-    setCurrentQrValue(JSON.stringify(payload));
-    state.currentTick = (state.currentTick + 1) % state.tickCount;
-  };
-
-  const startSession = () => {
-    const safeSpeed = Math.max(100, Number(speedMs) || DEFAULTS.speedMs);
-    const safeDuration = Math.max(5, Number(durationSec) || DEFAULTS.durationSec);
-    const rawTickCount = Math.floor((safeDuration * 1000) / safeSpeed);
-    const tickCount = Math.max(1, rawTickCount);
-    const safeValidCount = Math.max(1, Number(validQrCount) || DEFAULTS.validQrCount);
-    const schedule = buildValidSchedule(safeValidCount, tickCount, safeSpeed);
-    const sessionId = `ATT-${Date.now().toString(36).toUpperCase()}`;
-
-    clearAllTimers();
-    setElapsedSec(0);
     setRunning(true);
-    setSessionLabel(sessionId);
-    sessionRef.current = {
-      id: sessionId,
-      tickCount,
-      currentTick: 0,
-      validTicks: schedule,
-      validEmitted: 0,
-      speedMs: safeSpeed,
-    };
+    setElapsedTime(0);
+    setCurrentIndex(0);
 
-    emitNextQr();
+    imageIntervalRef.current = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % images.length);
+    }, interval);
 
-    qrIntervalRef.current = setInterval(emitNextQr, safeSpeed);
     timerRef.current = setInterval(() => {
-      setElapsedSec((prev) => {
-        const next = prev + 1;
-        if (next >= safeDuration) {
-          stopSession();
-          return safeDuration;
-        }
-        return next;
+      setElapsedTime((prev) => {
+        const newTime = prev + 1;
+        if (newTime >= 30) stopAll();
+        return newTime;
       });
     }, 1000);
+
+    const flashCount = 3;
+    const minDelay = 3000;
+    const maxDelay = 27000;
+    const minGap = 3000;
+
+    const delays = [];
+
+    while (delays.length < flashCount) {
+      const candidate = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
+      if (delays.every((t) => Math.abs(t - candidate) >= minGap)) {
+        delays.push(candidate);
+      }
+    }
+
+    delays.sort((a, b) => a - b);
+
+    delays.forEach((delay) => {
+      const timeoutId = setTimeout(() => {
+        setShowQR(true);
+        setTimeout(() => setShowQR(false), 500);
+      }, delay);
+      qrTimeoutRefs.current.push(timeoutId);
+    });
   };
 
-  const resetDefaults = () => {
-    setSpeedMs(DEFAULTS.speedMs);
-    setValidQrCount(DEFAULTS.validQrCount);
-    setDurationSec(DEFAULTS.durationSec);
-  };
-
-  useEffect(() => () => clearAllTimers(), []);
-
-  const remaining = Math.max(0, durationSec - elapsedSec);
+  useEffect(() => stopAll, []);
 
   return (
-    <main className="app-shell">
-      {!running ? (
-        <section className="setup-card">
-          <p className="eyebrow">Attendance System</p>
-          <h1>Configure QR Session</h1>
-          <p className="subtext">
-            Set how fast codes rotate, how many valid attendance pulses are injected,
-            and total run time. Defaults are ready to use.
-          </p>
+    <div style={{ textAlign: "center", marginTop: "40px" }}>
+      <h2>QR Code</h2>
 
-          <div className="settings-grid">
-            <label className="field">
-              <span>Speed per QR (seconds)</span>
-              <input
-                type="number"
-                min="0.1"
-                step="0.1"
-                value={(Number(speedMs) / 1000).toFixed(1)}
-                onChange={(e) =>
-                  setSpeedMs(Math.max(100, Math.round(Number(e.target.value || 0.5) * 1000)))
-                }
-              />
-            </label>
-
-            <label className="field">
-              <span>Number of valid QRs</span>
-              <input
-                type="number"
-                min="1"
-                step="1"
-                value={validQrCount}
-                onChange={(e) => setValidQrCount(Math.max(1, Number(e.target.value || 1)))}
-              />
-            </label>
-
-            <label className="field">
-              <span>Shuffling duration (seconds)</span>
-              <input
-                type="number"
-                min="5"
-                step="1"
-                value={durationSec}
-                onChange={(e) => setDurationSec(Math.max(5, Number(e.target.value || 5)))}
-              />
-            </label>
+      <div
+        style={{
+          width: "80vmin",
+          height: "80vh",
+          maxWidth: "90vw",
+          margin: "0 auto",
+          border: "8px solid white",
+          borderRadius: "16px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: "white",
+        }}
+      >
+        {showQR ? (
+          <div
+            style={{
+              width: "100%",
+              height: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <QRCodeSVG
+              value={qrValue}
+              style={{
+                width: "80%",
+                height: "80%",
+                maxWidth: "100%",
+                maxHeight: "100%",
+              }}
+              includeMargin={false}
+            />
           </div>
+        ) : (
+          <img
+            src={images[currentIndex]}
+            alt="cycling"
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              borderRadius: "0px",
+            }}
+          />
+        )}
+      </div>
 
-          <div className="defaults-note">
-            Default: 0.5s per QR, 4 valid QRs, 30s duration
-          </div>
+      <div style={{ marginTop: "20px", fontSize: "1.5rem" }}>
+        Elapsed Time: {elapsedTime}s
+      </div>
 
-          <div className="setup-actions">
-            <button className="ghost-btn" onClick={resetDefaults}>
-              Reset Defaults
-            </button>
-            <button className="primary-btn" onClick={startSession}>
-              Start Session
-            </button>
-          </div>
-        </section>
-      ) : (
-        <section className="session-view">
-          <div className="qr-stage">
-            <div className="qr-frame">
-              <QRCodeSVG value={currentQrValue} className="qr-svg" includeMargin={false} />
-            </div>
-          </div>
-
-          <aside className="session-panel">
-            <p className="eyebrow">Live Session</p>
-            <h2>{sessionLabel}</h2>
-            <div className="timer-box">
-              <span className="timer-label">Time Left</span>
-              <span className="timer-value">{remaining}s</span>
-            </div>
-            <div className="meta-line">
-              Elapsed: <strong>{elapsedSec}s</strong>
-            </div>
-            <button className="danger-btn" onClick={stopSession}>
-              End Session
-            </button>
-          </aside>
-        </section>
-      )}
-    </main>
+      <div style={{ marginTop: "20px" }}>
+        {running ? (
+          <button
+            onClick={startSequence}
+            style={{
+              padding: "10px 20px",
+              fontSize: "1rem",
+              backgroundColor: "#e74c3c",
+              color: "white",
+              border: "none",
+              cursor: "pointer",
+              borderRadius: "5px",
+            }}
+          >
+            Reset Now
+          </button>
+        ) : (
+          <button
+            onClick={startSequence}
+            style={{
+              padding: "10px 20px",
+              fontSize: "1rem",
+              backgroundColor: "#2ecc71",
+              color: "white",
+              border: "none",
+              cursor: "pointer",
+              borderRadius: "5px",
+            }}
+          >
+            ▶ Start Again
+          </button>
+        )}
+      </div>
+    </div>
   );
 };
 
