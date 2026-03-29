@@ -11,13 +11,36 @@ const DEFAULTS = {
 const randomToken = () =>
   `${Math.random().toString(36).slice(2, 10)}-${Date.now().toString(36)}`;
 
-const buildValidSchedule = (validCount, tickCount) => {
-  const targetCount = Math.min(validCount, Math.max(1, tickCount));
-  const selected = new Set();
-  while (selected.size < targetCount) {
-    selected.add(Math.floor(Math.random() * tickCount));
+const randomIntInRange = (min, max) => {
+  if (max <= min) return min;
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+};
+
+const buildValidSchedule = (validCount, tickCount, speedMs) => {
+  const firstValidAfterTicks = Math.ceil(3000 / speedMs);
+  const minGapTicks = Math.max(1, Math.ceil(2000 / speedMs));
+
+  if (firstValidAfterTicks >= tickCount) {
+    return [];
   }
-  return new Set([...selected].sort((a, b) => a - b));
+
+  const maxPossible =
+    Math.floor((tickCount - 1 - firstValidAfterTicks) / minGapTicks) + 1;
+  const targetCount = Math.min(validCount, maxPossible);
+
+  if (targetCount <= 0) {
+    return [];
+  }
+
+  const schedule = [];
+  for (let i = 0; i < targetCount; i += 1) {
+    const remaining = targetCount - i - 1;
+    const minTick = i === 0 ? firstValidAfterTicks : schedule[i - 1] + minGapTicks;
+    const maxTick = tickCount - 1 - remaining * minGapTicks;
+    schedule.push(randomIntInRange(minTick, maxTick));
+  }
+
+  return schedule;
 };
 
 const App = () => {
@@ -30,6 +53,7 @@ const App = () => {
   const [currentQrValue, setCurrentQrValue] = useState("");
   const [currentIsValid, setCurrentIsValid] = useState(false);
   const [validShown, setValidShown] = useState(0);
+  const [scheduledValidCount, setScheduledValidCount] = useState(0);
   const [sessionLabel, setSessionLabel] = useState("");
 
   const sessionRef = useRef({
@@ -58,7 +82,7 @@ const App = () => {
 
   const emitNextQr = () => {
     const state = sessionRef.current;
-    const isValid = state.validTicks.has(state.currentTick);
+    const isValid = state.validTicks.includes(state.currentTick);
     const nowIso = new Date().toISOString();
     const payload = isValid
       ? {
@@ -90,12 +114,13 @@ const App = () => {
     const rawTickCount = Math.floor((safeDuration * 1000) / safeSpeed);
     const tickCount = Math.max(1, rawTickCount);
     const safeValidCount = Math.max(1, Number(validQrCount) || DEFAULTS.validQrCount);
-    const schedule = buildValidSchedule(safeValidCount, tickCount);
+    const schedule = buildValidSchedule(safeValidCount, tickCount, safeSpeed);
     const sessionId = `ATT-${Date.now().toString(36).toUpperCase()}`;
 
     clearAllTimers();
     setElapsedSec(0);
     setValidShown(0);
+    setScheduledValidCount(schedule.length);
     setRunning(true);
     setSessionLabel(sessionId);
     sessionRef.current = {
@@ -214,12 +239,12 @@ const App = () => {
             <div className="meta-line">
               Valid pulses shown:{" "}
               <strong>
-                {validShown}/{Math.max(1, validQrCount)}
+                {validShown}/{scheduledValidCount}
               </strong>
             </div>
-            <div className={`status-chip ${currentIsValid ? "status-valid" : "status-noise"}`}>
-              {currentIsValid ? "Valid attendance QR active" : "Decoy QR active"}
-            </div>
+            {currentIsValid && (
+              <div className="status-chip status-valid">Valid attendance QR active</div>
+            )}
             <button className="danger-btn" onClick={stopSession}>
               End Session
             </button>
